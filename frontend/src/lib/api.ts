@@ -3,7 +3,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const runtimeConfig = window.__SANKET_CONFIG__ || {};
 const API_BASE = runtimeConfig.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || "";
-const AUTH_MODE = runtimeConfig.authMode || import.meta.env.VITE_AUTH_MODE || "demo";
+// Production must fail closed to Supabase if runtime config cannot be fetched.
+// Demo auth is only the local-development fallback.
+const AUTH_MODE = runtimeConfig.authMode || (import.meta.env.PROD ? "supabase" : import.meta.env.VITE_AUTH_MODE || "demo");
 const supabaseUrl = runtimeConfig.supabaseUrl || import.meta.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = runtimeConfig.supabaseAnonKey || import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase: SupabaseClient | null = supabaseUrl && supabaseAnonKey
@@ -24,7 +26,8 @@ async function authorizationHeaders(headers?: HeadersInit) {
     if (error) throw error;
     const { data, error: sessionError } = await supabase!.auth.getSession();
     if (sessionError) throw sessionError;
-    if (data.session?.access_token) result.set("Authorization", `Bearer ${data.session.access_token}`);
+    if (!data.session?.access_token) throw new Error("Your Supabase session is missing or expired. Sign in again.");
+    result.set("Authorization", `Bearer ${data.session.access_token}`);
   }
   return result;
 }
