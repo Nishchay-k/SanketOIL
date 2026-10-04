@@ -16,6 +16,18 @@
   },
   "rewrites": [
     {
+      "source": "/runtime-config",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/healthz",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
       "source": "/api/(.*)",
       "destination": {
         "service": "backend"
