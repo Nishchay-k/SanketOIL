@@ -316,6 +316,69 @@ def get_nearby_wells(well_code: str, radius_km: float) -> list[Record] | None:
     )
 
 
+def get_well_contexts(well_ids: list[int]) -> dict[int, dict[str, list[Record]]]:
+    """Fetch structured context for several wells with one query per record type."""
+    unique_ids = list(dict.fromkeys(well_ids))
+    result = {
+        well_id: {
+            "reservoir_properties": [],
+            "mud_programs": [],
+            "casing_programs": [],
+            "cementing_records": [],
+        }
+        for well_id in unique_ids
+    }
+    if not unique_ids:
+        return result
+    placeholders = ",".join("?" for _ in unique_ids)
+    queries = {
+        "reservoir_properties": f"SELECT * FROM reservoir_properties WHERE well_id IN ({placeholders}) ORDER BY well_id,depth_start",
+        "mud_programs": f"SELECT * FROM mud_programs WHERE well_id IN ({placeholders}) ORDER BY well_id,depth_start",
+        "casing_programs": f"SELECT * FROM casing_programs WHERE well_id IN ({placeholders}) ORDER BY well_id,setting_depth",
+        "cementing_records": f"SELECT * FROM cementing_records WHERE well_id IN ({placeholders}) ORDER BY well_id,depth_start",
+    }
+    with connection_scope() as connection:
+        for key, sql in queries.items():
+            for record in connection.execute(sql, unique_ids):
+                result[record["well_id"]][key].append(record)
+    return result
+
+
+def get_parameters_for_wells(well_ids: list[int], limit: int = 60) -> dict[int, list[Record]]:
+    """Fetch recent readings for multiple wells in one database round trip."""
+    unique_ids = list(dict.fromkeys(well_ids))
+    result = {well_id: [] for well_id in unique_ids}
+    if not unique_ids:
+        return result
+    placeholders = ",".join("?" for _ in unique_ids)
+    sql = f"""SELECT well_id,timestamp,depth,rop,wob,rpm,torque,standpipe_pressure,mud_weight,flow_rate,pit_volume,source
+              FROM (
+                  SELECT well_id,timestamp,depth,rop,wob,rpm,torque,standpipe_pressure,mud_weight,flow_rate,pit_volume,source,
+                         ROW_NUMBER() OVER (PARTITION BY well_id ORDER BY timestamp DESC) AS reading_number
+                  FROM drilling_parameters WHERE well_id IN ({placeholders})
+              ) recent
+              WHERE reading_number<=?
+              ORDER BY well_id,timestamp DESC"""
+    with connection_scope() as connection:
+        for record in connection.execute(sql, (*unique_ids, limit)):
+            result[record["well_id"]].append(record)
+    return result
+
+
+def get_surveys_for_wells(well_ids: list[int]) -> dict[int, list[Record]]:
+    """Fetch survey stations for multiple wells in one database round trip."""
+    unique_ids = list(dict.fromkeys(well_ids))
+    result = {well_id: [] for well_id in unique_ids}
+    if not unique_ids:
+        return result
+    placeholders = ",".join("?" for _ in unique_ids)
+    sql = f"SELECT well_id,measured_depth,tvd,inclination,azimuth FROM surveys WHERE well_id IN ({placeholders}) ORDER BY well_id,measured_depth"
+    with connection_scope() as connection:
+        for record in connection.execute(sql, unique_ids):
+            result[record["well_id"]].append(record)
+    return result
+
+
 def get_events(where: str = "", params: Any = ()) -> list[Record]:
     sql = """SELECT e.*, w.well_code, w.name AS well_name, w.field, w.latitude, w.longitude
              FROM drilling_events e JOIN wells w ON w.id=e.well_id"""

@@ -19,8 +19,8 @@ def _interval_matches(item, depth, formation):
     return item.get("formation") == formation and item.get("depth_start", 0) <= depth <= item.get("depth_end", 0)
 
 
-def _context_at_depth(well_id, depth, formation):
-    context = store.get_well_context(well_id)
+def _context_at_depth(well_id, depth, formation, contexts=None):
+    context = contexts.get(well_id) if contexts is not None else store.get_well_context(well_id)
     return {
         "reservoir_properties": [item for item in context["reservoir_properties"] if _interval_matches(item, depth, formation)],
         "mud_programs": [item for item in context["mud_programs"] if _interval_matches(item, depth, formation)],
@@ -44,22 +44,26 @@ def _parameter_comparison(current, offset):
     return {"values": comparisons, "similarity": round(sum(scores) / len(scores), 3) if scores else None}
 
 
-def build(well_code, depth, formation, radius_km=10):
+def build(well_code, depth, formation, radius_km=10, ranked_offsets=None, all_events=None):
     active = store.get_well(well_code)
     if not active:
         return None
-    active_context = _context_at_depth(active["id"], depth, formation)
-    current_readings = store.get_parameters(active["id"], 1)
+    offsets = ranked_offsets if ranked_offsets is not None else intelligence.rank_offsets(active, radius_km, depth, formation, all_events)
+    events = all_events if all_events is not None else store.get_events()
+    well_ids = [active["id"]] + [offset["id"] for offset in offsets]
+    contexts = store.get_well_contexts(well_ids)
+    readings_by_well = store.get_parameters_for_wells(well_ids, 60)
+    surveys_by_well = store.get_surveys_for_wells(well_ids)
+    active_context = _context_at_depth(active["id"], depth, formation, contexts)
+    current_readings = readings_by_well.get(active["id"], [])
     current_parameters = current_readings[0] if current_readings else None
-    offsets = intelligence.rank_offsets(active, radius_km, depth, formation)
-    events = store.get_events()
     comparisons = []
     for offset in offsets:
         offset_events = [event for event in events if event["well_code"] == offset["well_code"] and event["formation"] == formation and intelligence._depth_gap(depth, event["depth_start"], event["depth_end"]) <= 200]
-        context = _context_at_depth(offset["id"], depth, formation)
-        readings = store.get_parameters(offset["id"], 60)
+        context = _context_at_depth(offset["id"], depth, formation, contexts)
+        readings = readings_by_well.get(offset["id"], [])
         nearest_reading = min(readings, key=lambda item: abs(item["depth"] - depth)) if readings else None
-        surveys = store.get_surveys(offset["id"])
+        surveys = surveys_by_well.get(offset["id"], [])
         nearest_survey = min(surveys, key=lambda item: abs(item["measured_depth"] - depth)) if surveys else None
         if not offset_events and not any(context.values()):
             continue

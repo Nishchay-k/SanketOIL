@@ -188,6 +188,40 @@ def bootstrap():
     return store.get_bootstrap_data()
 
 
+@app.get("/api/operations/context", dependencies=[Depends(auth.require_user)])
+def operations_context(
+    well_id: str = "A-101",
+    radius_km: float = Query(default=25, ge=1, le=100),
+    depth: float | None = Query(default=None, ge=0, le=8000),
+    formation: str | None = None,
+):
+    """Load the dashboard's well context in one serverless request."""
+    active = store.get_well(well_id)
+    if not active:
+        raise HTTPException(status_code=404, detail="Well " + well_id + " was not found.")
+    depth_value = active["current_depth"] or 0 if depth is None else depth
+    formation_value = _check_formation(formation or active["formation"])
+    event_rows = store.get_events()
+    nearby = intelligence.rank_offsets(active, radius_km, depth_value, formation_value, event_rows)
+    prediction_response = predict_risk(RiskInput(
+        well_id=well_id,
+        depth=depth_value,
+        formation=formation_value,
+        radius_km=radius_km,
+    ))
+    readings = store.get_parameters(active["id"], 60)
+    correlation_result = correlation.build(well_id, depth_value, formation_value, radius_km, nearby, event_rows)
+    generated_alerts = prediction_response["prediction"].get("alerts", [])
+    return {
+        "nearby": {"well_id": well_id, "radius_km": radius_km, "depth": depth_value, "formation": formation_value, "wells": nearby, "count": len(nearby)},
+        "events": {"events": event_rows, "count": len(event_rows)},
+        "telemetry": {"well_code": well_id, "readings": readings},
+        "risk": prediction_response,
+        "correlation": {"correlation": correlation_result},
+        "alerts": {"alerts": generated_alerts, "count": len(generated_alerts)},
+    }
+
+
 @app.get("/api/formations", dependencies=[Depends(auth.require_user)])
 def formations():
     result = store.rows("SELECT formation AS name,top_depth,bottom_depth,description FROM formation_intervals ORDER BY top_depth")

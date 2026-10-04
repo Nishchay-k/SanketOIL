@@ -75,6 +75,7 @@ export const api = {
     return data.session;
   },
   bootstrap: () => request("/api/bootstrap"),
+  operationsContext: (wellCode: string, radius: number, depth: number, formation: string) => request("/api/operations/context" + queryString({ well_id: wellCode, radius_km: radius, depth, formation })),
   health: () => request("/api/health"),
   formations: () => request("/api/formations"),
   wells: (filters?: Record<string, unknown>) => request("/api/wells" + queryString(filters)),

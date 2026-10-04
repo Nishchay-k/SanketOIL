@@ -62,13 +62,16 @@ def _depth_gap(depth, start, end):
     return min(abs(depth - start), abs(depth - end))
 
 
-def rank_offsets(active, radius_km, depth=None, formation=None):
+def rank_offsets(active, radius_km, depth=None, formation=None, all_events=None):
     if depth is None:
         depth = active.get("current_depth") or 0
     formation = formation or active.get("formation")
     candidates = []
     postgis_candidates = store.get_nearby_wells(active["well_code"], radius_km)
     possible_wells = postgis_candidates if postgis_candidates is not None else store.get_wells()
+    events_by_well = {}
+    for event in (all_events if all_events is not None else store.get_events()):
+        events_by_well.setdefault(event["well_code"], []).append(event)
     for well in possible_wells:
         if well["well_code"] == active["well_code"]:
             continue
@@ -77,7 +80,7 @@ def rank_offsets(active, radius_km, depth=None, formation=None):
             distance = distance_km(active["latitude"], active["longitude"], well["latitude"], well["longitude"])
         if distance > radius_km:
             continue
-        well_events = store.get_events("e.well_id = ?", (well["id"],))
+        well_events = events_by_well.get(well["well_code"], [])
         relevant = [
             event for event in well_events
             if event["formation"] == formation and _depth_gap(depth, event["depth_start"], event["depth_end"]) <= 200

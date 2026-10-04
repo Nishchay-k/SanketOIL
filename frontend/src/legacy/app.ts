@@ -173,7 +173,7 @@ function renderLogin() {
       <g class="scene-rig"><path d="m474 520 68-309 70 309M495 425h93m-81-57h67m-55-58h43m-31-57h20M485 472h84m-77-29 91 29m-83-73 75 25m-66-71 62 20m-53-64 48 19m-39-61 39 16" fill="none" stroke="#e0c9a3" stroke-width="7" stroke-linecap="round"/><path d="M531 212h23m-14-48v48" stroke="#f1c98e" stroke-width="5"/><path d="M536 157h15l-7-25Z" fill="#f5cf8b"/><path d="M544 520v96" stroke="#c7a77a" stroke-width="3"/><path d="M440 523h138v12H440z" fill="#d3b389"/><rect x="505" y="488" width="77" height="31" rx="3" fill="#1e3032"/><rect x="514" y="493" width="18" height="12" fill="#e6a068" opacity=".8"/><circle cx="522" cy="520" r="7" fill="#1b2526"/><circle cx="566" cy="520" r="7" fill="#1b2526"/></g>
       <g class="scene-pump"><path d="M171 559h126m-90 0 21-69 24 69m-16-54 79-20m-79 20-41-22" fill="none" stroke="#c69a6b" stroke-width="7" stroke-linecap="round"/><path d="M269 485q36-7 51 7-17 10-38 8" fill="#d4ad7b"/><path d="M303 499v57" stroke="#d3b58a" stroke-width="3"/><circle cx="209" cy="548" r="13" fill="#242c29" stroke="#bd9768" stroke-width="4"/></g>
       <path d="M0 644q188-20 358 21t309-7 293 2v100H0Z" fill="#1b2625"/><g fill="#dec59d" opacity=".5"><circle cx="95" cy="581" r="2"/><circle cx="348" cy="616" r="2"/><circle cx="789" cy="589" r="2"/><circle cx="868" cy="640" r="2"/></g>
-    </svg></div><section class="login-intro" aria-label="About SANKET"><span class="login-intro-label">NEARBY WELLS INTELLIGENCE</span><h1>Know what nearby wells encountered.</h1><p>Review offset-well history, drilling events, and source documents alongside the active well.</p><ul><li>Compare wells by depth and formation</li><li>Find events and reported mitigations</li><li>Review evidence before making a decision</li></ul></section><section class="login-card" aria-label="SANKET sign in"><div class="login-brand"><img class="brand-emblem login-emblem" src="/branding/sanket-mark.png" alt=""><span class="brand-name">SANKET<small>NEARBY WELLS INTELLIGENCE SYSTEM</small></span></div><div class="login-form-wrap"><div class="eyebrow">ENGINEER ACCESS</div><h2>Welcome back.</h2><p>Read the signals. Understand the well.</p><form id="login-form"><label class="form-label" for="login-id">Engineer ID</label><input id="login-id" name="login-id" autocomplete="username" value="${demoMode ? DEMO_CREDENTIALS.id : ""}" required><label class="form-label" for="login-password">Password</label><input id="login-password" name="login-password" type="password" autocomplete="current-password" value="${demoMode ? DEMO_CREDENTIALS.password : ""}" required><div class="login-hint">${demoMode ? "Demo credentials are prefilled for this prototype." : "Sign in with your SANKET account."}</div><div id="login-error" class="form-feedback" role="alert"></div><button class="login-submit" type="submit">Enter operations workspace ${icon("arrow")}</button></form><div class="login-footer"><span><i></i>${demoMode ? "Local demo environment" : "Secure account sign-in"}</span><span>${demoMode ? "Access is not an OIL account" : "SANKET access"}</span></div></div></section></main>`;
+    </svg></div><section class="login-intro" aria-label="About SANKET"><span class="login-intro-label">NEARBY WELLS INTELLIGENCE</span><h1>Know what nearby wells encountered.</h1><p>Review offset-well history, drilling events, and source documents alongside the active well.</p><ul><li>Compare wells by depth and formation</li><li>Find events and reported mitigations</li><li>Review evidence before making a decision</li></ul></section><section class="login-card" aria-label="SANKET sign in"><div class="login-brand"><img class="brand-emblem login-emblem" src="/branding/sanket-mark.png" alt=""><span class="brand-name">SANKET<small>NEARBY WELLS INTELLIGENCE SYSTEM</small></span></div><div class="login-form-wrap"><div class="eyebrow">ENGINEER ACCESS</div><h2>Welcome back.</h2><p>Read the signals. Understand the well.</p><form id="login-form"><label class="form-label" for="login-id">Engineer ID</label><input id="login-id" name="login-id" autocomplete="username" value="${demoMode ? DEMO_CREDENTIALS.id : ""}" required><label class="form-label" for="login-password">Password</label><input id="login-password" name="login-password" type="password" autocomplete="current-password" value="${demoMode ? DEMO_CREDENTIALS.password : ""}" required><div class="login-hint">${demoMode ? "Demo access is prefilled. Click below to enter the SIH demo." : "Sign in with your SANKET account."}</div><div id="login-error" class="form-feedback" role="alert"></div><button class="login-submit" type="submit">${demoMode ? "Enter SIH demo workspace" : "Enter operations workspace"} ${icon("arrow")}</button></form><div class="login-footer"><span><i></i>${demoMode ? "Local demo environment" : "Secure account sign-in"}</span><span>${demoMode ? "Access is not an OIL account" : "SANKET access"}</span></div></div></section></main>`;
   document.getElementById("login-form").addEventListener("submit", async function (event) {
     event.preventDefault();
     const id = document.getElementById("login-id").value.trim();
@@ -194,7 +194,7 @@ function renderLogin() {
     } catch (error) {
       feedback.textContent = error.message || "Sign-in could not be completed.";
       submit.disabled = false;
-      submit.innerHTML = "Enter operations workspace " + icon("arrow");
+      submit.innerHTML = (demoMode ? "Enter SIH demo workspace " : "Enter operations workspace ") + icon("arrow");
     }
   });
 }
@@ -304,9 +304,9 @@ async function loadData() {
     state.loading = false;
     state.contextLoading = true;
     render();
-    connectTelemetry(state.activeWellCode);
     loadContext().then(async function () {
       state.contextLoading = false;
+      connectTelemetry(state.activeWellCode);
       if (state.mapView === "profile") await loadTrajectories();
       render();
     }).catch(function (error) {
@@ -324,25 +324,13 @@ async function loadData() {
 async function loadContext() {
   const well = activeWell();
   if (!well) return;
-  const [nearby, events, telemetry, risk, correlationResult] = await Promise.all([
-    api.nearby(state.activeWellCode, state.radius, state.depth, state.formation),
-    api.events({}),
-    api.telemetry(state.activeWellCode),
-    api.predictRisk({
-      well_id: state.activeWellCode,
-      depth: Number(state.depth),
-      formation: state.formation,
-      radius_km: state.radius
-    }),
-    api.correlation(state.activeWellCode, state.radius, Number(state.depth), state.formation)
-  ]);
-  state.nearby = nearby.wells || [];
-  state.events = events.events || [];
-  state.telemetry = telemetry.readings && telemetry.readings[0] ? telemetry.readings[0] : null;
-  state.risk = risk.prediction || null;
-  state.correlation = correlationResult.correlation || null;
-  const alertResult = await api.alerts(state.activeWellCode);
-  state.alerts = alertResult.alerts || [];
+  const context = await api.operationsContext(state.activeWellCode, state.radius, Number(state.depth), state.formation);
+  state.nearby = context.nearby.wells || [];
+  state.events = context.events.events || [];
+  state.telemetry = context.telemetry.readings && context.telemetry.readings[0] ? context.telemetry.readings[0] : null;
+  state.risk = context.risk.prediction || null;
+  state.correlation = context.correlation.correlation || null;
+  state.alerts = context.alerts.alerts || [];
   if (!state.selectedOffset || !state.nearby.some(function (item) { return item.well_code === state.selectedOffset; })) {
     state.selectedOffset = (evidenceEvents()[0] && evidenceEvents()[0].well_code) || (state.nearby[0] && state.nearby[0].well_code) || null;
   }
@@ -451,11 +439,11 @@ async function selectWell(wellCode) {
   state.risk = null;
   state.telemetry = null;
   state.contextLoading = true;
-  connectTelemetry(wellCode);
   render();
   try {
     await loadContext();
     state.contextLoading = false;
+    connectTelemetry(wellCode);
     if (state.mapView === "profile") await loadTrajectories();
     else render();
   } catch (error) {
@@ -1372,4 +1360,3 @@ if (api.authMode === "supabase") {
   }).catch(function () { renderLogin(); });
 } else if (sessionStorage.getItem("nwis.demo-auth") === "1") loadData();
 else renderLogin();
-
