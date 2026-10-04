@@ -132,6 +132,11 @@ def engine() -> Engine:
                 kwargs: dict[str, Any] = {"pool_pre_ping": True, "future": True}
                 if url.startswith("sqlite"):
                     kwargs["connect_args"] = {"check_same_thread": False}
+                elif url.startswith("postgresql+psycopg://") and get_settings().is_production:
+                    # Vercel functions are short-lived and Supabase's transaction pooler
+                    # cannot retain prepared statements between backend connections.
+                    kwargs.update({"pool_size": 1, "max_overflow": 0})
+                    kwargs["connect_args"] = {"prepare_threshold": None}
                 _engine = create_engine(url, **kwargs)
     return _engine
 

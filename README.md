@@ -1,44 +1,75 @@
 # SANKET — Nearby Wells Intelligence System
 
-SANKET helps drilling teams find nearby wells, compare historical events, review source documents, and follow live telemetry alongside an active well.
+SANKET is a decision-support prototype for drilling teams. It brings nearby-well information, historical drilling events, report evidence, and risk indicators into one workspace.
 
-> **Data notice:** Included wells, events, and readings are fictional development data. They are not Oil India Limited operating records.
+The project is built for [Smart India Hackathon problem statement 26121](https://www.sih.gov.in/sih2026PS), which asks for a nearby-well intelligence system to complement eRTMAC.
 
-## Features
+> **Sample data:** The included wells, events, and readings are fictional demonstration records. They are not Oil India Limited operational data.
 
-- Map nearby wells and rank them by distance, formation, depth, and recorded event history.
-- Compare surveys, event intervals, reservoir context, mud and casing programs, and telemetry.
-- Search wells, events, document text, and drilling symptoms with source links.
-- Review explainable risk signals and alerts with their supporting evidence.
-- Add wells and upload PDF, DOCX, TXT, CSV, JSON, and image documents.
-- Keep extracted page references and mark detected event candidates as pending engineer review.
-- Stream telemetry updates and alerts over Server-Sent Events (SSE).
+## What it does
 
-## Run with Docker
+- Maps nearby wells and ranks them by distance, formation, depth, and recorded event history.
+- Shows well surveys, drilling events, reservoir details, programs, and available telemetry.
+- Compares offset wells and historical events by depth and formation.
+- Searches wells, events, and extracted document text.
+- Accepts PDF, DOCX, TXT, Markdown, CSV, JSON, LOG, PNG, JPG, JPEG, TIF, and TIFF documents.
+- Extracts text and source-page references. Scanned PDFs and images can use OCR.
+- Presents explainable risk indicators and alerts with supporting evidence.
+- Streams telemetry and alert updates to the dashboard.
 
-Install Docker Desktop, then from the project folder run:
+## How the intelligence works
+
+- Well relevance is calculated from distance (25%), formation (30%), depth (25%), and event history (20%).
+- Risk indicators use explainable rules based on historical events and available readings. They are not calibrated probabilities.
+- Document processing extracts text and candidate entities for engineer review. Evidence links retain the source document and page when available.
+- Keyword and PostgreSQL full-text search work by default. Optional semantic search uses a locally configured embedding model.
+- Telemetry can be demonstrated locally. SANKET does not currently connect to a live Oil India eRTMAC or WITSML feed.
+- SANKET supports engineering review; it does not control drilling equipment or replace operational procedures.
+
+## Technology
+
+| Area | Technology |
+| --- | --- |
+| User interface | React, TypeScript, Vite, Tailwind CSS |
+| API | Python, FastAPI |
+| Database | PostgreSQL, PostGIS, pgvector |
+| Database access and schema changes | SQLAlchemy, Alembic |
+| Authentication | Local demo mode; Supabase Auth is supported |
+| Document storage | Local storage for development; Supabase Storage is supported |
+| Live updates | Server-Sent Events (SSE) |
+
+The React entry point mounts the current TypeScript dashboard through a compatibility module. Existing dashboard styling is maintained in CSS.
+
+## Run the local demo
+
+### With Docker
+
+Install Docker Desktop, then run from the project folder:
 
 ```sh
 docker compose up --build
 ```
 
-Open [http://localhost:8000](http://localhost:8000). Compose starts PostgreSQL with PostGIS and pgvector, runs the Alembic migration, and launches the FastAPI service with the built React frontend. Local Compose uses demo sign-in and synthetic development records.
+Open [http://localhost:8000](http://localhost:8000). Compose starts the app and a local PostgreSQL database with PostGIS and pgvector, applies the schema migration, and loads fictional sample records.
 
-Stop the services with `Ctrl+C`, or run `docker compose down`. The database and local documents remain in Docker volumes. `docker compose down -v` deletes those local volumes.
+The local demo login is prefilled:
 
-## Run without Docker
+- **ID:** `engineer@oilindia.demo`
+- **Password:** `NWIS-demo-26121`
 
-Use Python 3.12+, Node.js 20+, and a PostgreSQL database with PostGIS and pgvector enabled.
+### Without Docker
 
-1. Copy `.env.example` to `.env` and set `DATABASE_URL` for your PostgreSQL database.
-2. Install the dependencies:
+Install Python 3.12 or newer, Node.js 20 or newer, and PostgreSQL with PostGIS and pgvector enabled.
+
+1. Copy `.env.example` to `.env`. Set `DATABASE_URL` to your local PostgreSQL database.
+2. Install dependencies:
 
    ```sh
    python -m pip install -r backend/requirements.txt
    npm ci
    ```
 
-3. Create the database tables:
+3. Create or update the database schema:
 
    ```sh
    python -m alembic upgrade head
@@ -50,56 +81,48 @@ Use Python 3.12+, Node.js 20+, and a PostgreSQL database with PostGIS and pgvect
    python -m backend.app.main
    ```
 
-5. Start Vite in another terminal:
+5. Start the frontend in another terminal:
 
    ```sh
    npm run dev
    ```
 
-Vite runs at [http://localhost:5173](http://localhost:5173) and proxies API requests to port 8000. The default local settings seed fictional sample records. Set `SEED_DEMO_DATA=false` to use an empty database.
+Open [http://localhost:5173](http://localhost:5173). Vite forwards API requests to the local FastAPI service. The example configuration enables demo sign-in and fictional seed records.
 
-## Deploy to Render and Supabase
+## Project structure
 
-The included `render.yaml` deploys one Docker web service. FastAPI serves the Vite-built React assets and API from the same Render URL. Supabase supplies PostgreSQL, PostGIS, pgvector, Auth, and private document Storage.
-
-1. Create a Supabase project and enable the `postgis` and `vector` extensions. Create a **private** Storage bucket named `sanket-documents`.
-2. In Supabase's **Connect** dialog, copy the **Session pooler** connection string and set it as Render's `DATABASE_URL`. Render uses IPv4, while Supabase's direct database endpoint is IPv6 by default. The Session pooler supports persistent IPv4 backends. Keep its port and username as supplied and URL-encode reserved characters in the password. Production configuration requires encrypted PostgreSQL connections. See [Supabase connection modes](https://supabase.com/docs/guides/database/connecting-to-postgres) and [Render's IPv4 network note](https://supabase.com/docs/guides/troubleshooting/supabase--your-network-ipv4-and-ipv6-compatibility).
-3. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in Render.
-4. Apply the `render.yaml` blueprint. Render runs `alembic upgrade head` before deploy and checks `/healthz`.
-5. Create authorized users in Supabase Auth. The production login uses Supabase email/password sign-in; the service validates the returned JWT on API requests.
-6. If a separate frontend origin is used later, set `CORS_ORIGINS` to that exact origin. The included deployment serves frontend and API from the same origin.
-
-Never put the service-role key or database password in frontend variables. Render secrets are configured as private environment variables. Copy `.env.example` for the full local configuration reference.
-
-To import an existing SQLite database, point `DATABASE_URL` to the target PostgreSQL database, configure the appropriate storage mode, then run:
-
-```sh
-python scripts/migrate_sqlite_to_postgres.py path/to/nwis.sqlite3
+```text
+backend/
+  app/                 FastAPI routes, data access, risk rules, search, and document processing
+  migrations/          Alembic database migrations
+frontend/
+  src/                 React/Vite entry point, API client, and dashboard
+data/sample/            Fictional CSV records for the demo
+database/               PostgreSQL image used by local Docker Compose
+scripts/                Data seeding, export, telemetry, and import utilities
+tests/                  Backend regression tests
+docs/                   Architecture, API, database, and demo guides
 ```
 
-When `STORAGE_BACKEND=supabase`, the importer copies each original local document into the configured private bucket and updates its database reference. It stops if any source document bytes are missing.
-
-## Current intelligence behavior
-
-- **Implemented now:** deterministic nearby-well scoring, keyword and PostgreSQL full-text search, optional local sentence-embedding retrieval with pgvector, document extraction/OCR hooks, and explainable event/telemetry risk rules.
-- **Not implemented as production AI:** no hosted LLM, autonomous recommendations, trained drilling-risk model, or validated failure probabilities. pgvector works only when a compatible local embedding model is installed and configured. Without it, keyword and full-text search remain active.
-- **Live data boundary:** SSE is implemented and development telemetry can be simulated. There is no connected eRTMAC/WITSML endpoint or approved field mapping in this repository.
-
-Risk output supports engineering review. It does not control drilling equipment or replace operational procedures.
-
-## Useful commands
+## Development commands
 
 ```sh
+npm run dev
+npm run typecheck
 npm run build
 python -m unittest discover -s tests -v
-python -m alembic upgrade head
 ```
 
-The regression suite uses temporary SQLite databases only as a lightweight test fixture. Production data access uses PostgreSQL.
-
-## Project guides
+## Guides
 
 - [Architecture](docs/architecture.md)
 - [API routes](docs/api.md)
-- [Database and migration](docs/database.md)
+- [Database notes](docs/database.md)
 - [Demo workflow](docs/demo.md)
+
+## Current limitations
+
+- The sample dataset is fictional; operational conclusions require approved, representative Oil India data.
+- Live eRTMAC integration needs an authorized feed, credentials, and agreed field mappings.
+- Risk indicators use rules. A production-trained and independently validated risk model is not included.
+- OCR and extracted event candidates should be reviewed by an engineer, especially for poor-quality scans.
