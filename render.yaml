@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: sanket-nwis
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    preDeployCommand: alembic upgrade head
+    healthCheckPath: /healthz
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_MODE
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STORAGE_BACKEND
+        value: supabase
+      - key: SUPABASE_STORAGE_BUCKET
+        value: sanket-documents
+      - key: CORS_ORIGINS
+        value: ""
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: AUTO_CREATE_SCHEMA
+        value: "false"
+      - key: DATASET_LABEL
+        value: production
+      - key: VECTOR_DIMENSIONS
+        value: "384"
+      - key: NWIS_EMBEDDING_MODEL
+        value: ""

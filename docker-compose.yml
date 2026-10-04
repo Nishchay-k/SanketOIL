@@ -1,0 +1,52 @@
+services:
+  db:
+    build:
+      context: ./database
+    environment:
+      POSTGRES_DB: sanket
+      POSTGRES_USER: nwis
+      POSTGRES_PASSWORD: nwis-dev-password
+    ports:
+      - "5432:5432"
+    volumes:
+      - sanket-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nwis -d sanket"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: ["sh", "-c", "alembic upgrade head && python -m backend.app.main"]
+    environment:
+      APP_ENV: development
+      PORT: 8000
+      DATABASE_URL: postgresql+psycopg://nwis:nwis-dev-password@db:5432/sanket
+      DATASET_LABEL: synthetic-development
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000
+      AUTH_MODE: ${AUTH_MODE:-demo}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-sanket-documents}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      AUTO_CREATE_SCHEMA: "true"
+      MAX_UPLOAD_BYTES: 12582912
+      VECTOR_DIMENSIONS: 384
+      NWIS_EMBEDDING_MODEL: ${NWIS_EMBEDDING_MODEL:-}
+    volumes:
+      - sanket-documents:/app/data/documents
+    restart: unless-stopped
+
+volumes:
+  sanket-postgres:
+  sanket-documents:
